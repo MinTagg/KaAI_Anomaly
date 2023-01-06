@@ -17,10 +17,21 @@ model_resnet = 5
 
 # pipeline
 #data_csv_path = 'data/image_path.csv'
-data_csv_path = 'data/test_path.csv'
-json_path = 'data/json/'
+data_csv_path = 'data/for_test/json_test.csv'
+
+#json_path = 'data/json/'
+json_path = 'data/for_test/json/'
+resnet_path = 'data/resnet/'
 object_count = 10 * 4 # x,y,w,h 때문에 4를 곱해준다
 num_samples = 3
+resnet_output = (7,7,2048)
 
+# Optical Flow
+flow_size = (1280, 720, 2)
+flow_path = 'data/for_test/flow/frame'
+flow_size = (256,256)
+
+# image
+image_path = 'data/for_test/image/frame'
 
 #tf_config = tf.config.experimental()
