@@ -6,9 +6,10 @@ import train_argument as arg
 import os
 import cv2
 from skimage.transform import resize
+import random
 
 class ano_dataset(tf.data.Dataset):
-    def _generator(self):
+    def _generator():
         margin = (arg.model_input-1)//2
         df = pd.read_csv(arg.data_csv_path)
         df = df.sample(frac=1) # 데이터 프레임 셔플
@@ -33,6 +34,11 @@ class ano_dataset(tf.data.Dataset):
                 main_keys = json_files[mid_index].keys() # 중간 파일의 key들을 main_key에 저장한다 -> 확인
                 
                 for key in main_keys: # 각 key들을 하나씩 검사 -> 모든 파일에 key가 존재하는지 확인한다
+                    
+
+                #### key filter 추가 구역 :: if key in target_list:
+
+
                     state = True
                     result = [] # bbox 정보를 저장할 list -> 각 key별로 저장
                     for instance in json_files: # 모든 파일
@@ -58,7 +64,7 @@ class ano_dataset(tf.data.Dataset):
                     # 4. 잘라낸 optical flow 파일을 list 형식으로 저장한다
                 # 5. for문이 종료하고 나서 numpy로 하나의 덩어리로 stack 한다
                 # 6. stack 된 파일을 yield 한다
-                        concated = 0
+                        concated_list = []
                         for image_index in range(len(json_file_name)):
                             
                             # 이미지 불러오기
@@ -93,16 +99,60 @@ class ano_dataset(tf.data.Dataset):
 
                             # 이미지와 flow 데이터 합치기
                             image = np.concatenate((image, flow), axis = -1) # (1,256,256,5) 테스트에서는 flow 데이터 대신 이미지 사용해서 (1,256,256,6)
-                            if image_index == 0:
-                                concated = image
+                            concated_list.append(image)
+
+                        series = [i for i in range(arg.model_input)]
+
+                        label_1 = [0,1]
+                        label_2 = [0,1]
+
+                        if random.random() < arg.prob:
+                            anomaly_choice = random.choice(arg.task_list)
+                            if anomaly_choice == 1: # 순서 바꾸기
+                                #print('Anomaly Dataset :: Arrow of Time')
+                                series.reverse()
+                                label_1 = [1,0]
+                                label_2 = [1,0]
+                                pass 
+                            elif anomaly_choice == 2: # motion irregularity
+                                #################### 수동으로 설정하기
+                                #print('Anomaly Dataset :: Motion Irregularity')
+                                temp = random.random()
+                                if temp >= 0 and temp >= 0.25:
+                                    series[1] = series[0] # t-2, t-2, t ,t+1, t+2
+                                    #print('t-2, t-2, t ,t+1, t+2')
+                                elif temp >= 0.5:
+                                    series[0] = series[1] # t-1, t-1, t, t+1, t+2
+                                    #print('t-1, t-1, t, t+1, t+2')
+                                elif temp >= 0.75:
+                                    series[3] = series[4] # t-2, t-1, t, t+2, t+2
+                                    #print('t-2, t-1, t, t+2, t+2')
+                                else:
+                                    series[4] = series[4] # t-2, t-1, t, t+1, t+1
+                                    #print('t-2, t-1, t, t+1, t+1')
+                                label_2 = [1,0]
+                            
+                        concated = None
+                        state_ = False
+                        for index in series:
+                            #print(index)
+                            if state_ == False:
+                                concated = concated_list[index]
+                                state_ = True
                             else:
-                                concated = np.concatenate((concated, image), axis = 0) # (2,256,256,5)
-                        # concated = (5,256,256,5)
-                        yield concated
+                                concated = np.concatenate((concated, concated_list[index]), axis = 0)
+                            
+
+                        yield concated, result, label_1, label_2, concated_list[mid_index]    
     
     def __new__(cls):
         return tf.data.Dataset.from_generator(
             cls._generator,
-            output_signature=tf.TensorSpec(shape = (arg.model_input, arg.flow_size[0], arg.flow_size[1], 6), dtype = tf.float32),
-            args = (arg.num_samples, )
+            output_signature=(
+                tf.TensorSpec(shape = (arg.model_input, arg.flow_size[0], arg.flow_size[1], 6), dtype = tf.float32),
+                tf.TensorSpec(shape=(20,), dtype=tf.float32),
+                tf.TensorSpec(shape=(2,), dtype=tf.float32),
+                tf.TensorSpec(shape=(2,), dtype=tf.float32),
+                tf.TensorSpec(shape=(1, arg.flow_size[0], arg.flow_size[1], 6), dtype=tf.float32),
+            )
         )

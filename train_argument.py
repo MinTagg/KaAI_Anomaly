@@ -34,4 +34,11 @@ flow_size = (256,256)
 # image
 image_path = 'data/for_test/image/frame'
 
+# anomaly probability
+prob = 0.3 # 30% 확률로 이상 데이터를 생성한다
+# anomaly task list
+# task 3번 middle box prediction은 변형이 불가능한 task임
+task_list = [1,2]
+
+
 #tf_config = tf.config.experimental()
